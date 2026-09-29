@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.corner-gestures"
+          path="/org/gnome/shell/extensions/corner-gestures/schemas/">
+
+    <!-- Possible values: "disabled", "sleep", "overview", "show-desktop", "workspace-next", "workspace-prev" -->
+
+    <key name="top-left-action" type="s">
+      <default>"sleep"</default>
+      <summary>Action for top-left corner</summary>
+    </key>
+
+    <key name="top-right-action" type="s">
+      <default>"disabled"</default>
+      <summary>Action for top-right corner</summary>
+    </key>
+
+    <key name="bottom-left-action" type="s">
+      <default>"disabled"</default>
+      <summary>Action for bottom-left corner</summary>
+    </key>
+
+    <key name="bottom-right-action" type="s">
+      <default>"disabled"</default>
+      <summary>Action for bottom-right corner</summary>
+    </key>
+
+    <key name="corner-delay" type="i">
+      <default>300</default>
+      <range min="100" max="2000"/>
+      <summary>Delay in milliseconds before triggering corner action</summary>
+    </key>
+
+    <key name="bottom-left-trigger-size" type="i">
+      <default>20</default>
+      <range min="5" max="100"/>
+      <summary>Bottom-left trigger size in pixels</summary>
+    </key>
+
+    <key name="bottom-left-trigger-offset" type="i">
+      <default>60</default>
+      <range min="0" max="200"/>
+      <summary>Bottom-left trigger distance from bottom edge</summary>
+    </key>
+
+  </schema>
+</schemalist>
