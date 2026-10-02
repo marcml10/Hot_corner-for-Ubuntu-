@@ -28,7 +28,15 @@ function runAction(action) {
     switch (action) {
 
         case 'sleep':
-            startGentleLock();
+            startGentleLock('sleep');
+            break;
+
+        case 'blackout':
+            startGentleLock('blackout');
+            break;
+
+        case 'screen-off':
+            startGentleLock('screen-off');
             break;
 
         case 'overview':
@@ -74,11 +82,14 @@ let _gentleLockOverlay = null;
 let _gentleLockMotionId = null;
 let _gentleLockFadeId = null;
 let _gentleLockMonitor = null;
+let _gentleLockActionType = 'sleep';
 
-function startGentleLock() {
+function startGentleLock(actionType = 'sleep') {
     // Ignore repeated triggers while the transition is already active.
     if (_gentleLockOverlay)
         return;
+
+    _gentleLockActionType = actionType;
 
     _gentleLockMonitor = Main.layoutManager.primaryMonitor;
     if (!_gentleLockMonitor)
@@ -121,6 +132,15 @@ function startGentleLock() {
 
             if (nextOpacity >= 255) {
                 _gentleLockFadeId = null;
+                
+                if (_gentleLockActionType === 'screen-off') {
+                    try {
+                        GLib.spawn_command_line_async('busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i 1');
+                    } catch (e) {
+                        console.error('Failed to turn off screen:', e);
+                    }
+                }
+
                 return GLib.SOURCE_REMOVE;
             }
 
@@ -129,17 +149,17 @@ function startGentleLock() {
     );
 
     // Do not lock during the fade. Only movement after the screen is fully
-    // dark wakes it and opens GNOME's lock screen.
+    // dark wakes it and opens GNOME's lock screen (if configured to lock).
     _gentleLockMotionId = global.stage.connect('motion-event', () => {
         if (!_gentleLockOverlay || _gentleLockOverlay.opacity < 255)
             return Clutter.EVENT_PROPAGATE;
 
-        finishGentleLockAndShowScreenShield();
+        finishGentleLock(_gentleLockActionType);
         return Clutter.EVENT_PROPAGATE;
     });
 }
 
-function finishGentleLockAndShowScreenShield() {
+function finishGentleLock(actionType) {
     if (_gentleLockMotionId) {
         global.stage.disconnect(_gentleLockMotionId);
         _gentleLockMotionId = null;
@@ -150,16 +170,50 @@ function finishGentleLockAndShowScreenShield() {
         _gentleLockFadeId = null;
     }
 
-    if (_gentleLockOverlay) {
-        Main.layoutManager.removeChrome(_gentleLockOverlay);
-        _gentleLockOverlay.destroy();
-        _gentleLockOverlay = null;
+    if (actionType === 'sleep') {
+        if (_gentleLockOverlay) {
+            Main.layoutManager.removeChrome(_gentleLockOverlay);
+            _gentleLockOverlay.destroy();
+            _gentleLockOverlay = null;
+        }
+        _gentleLockMonitor = null;
+        // Use GNOME's native lock screen rather than implementing our own.
+        Main.screenShield.lock(true);
+    } else {
+        if (_gentleLockOverlay) {
+            // Fade back to transparent over 1.5 seconds.
+            _gentleLockFadeId = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                16,
+                () => {
+                    if (!_gentleLockOverlay) {
+                        _gentleLockFadeId = null;
+                        return GLib.SOURCE_REMOVE;
+                    }
+
+                    const nextOpacity = Math.max(
+                        0,
+                        _gentleLockOverlay.opacity - (255 * 16 / 1500)
+                    );
+
+                    _gentleLockOverlay.opacity = nextOpacity;
+
+                    if (nextOpacity <= 0) {
+                        Main.layoutManager.removeChrome(_gentleLockOverlay);
+                        _gentleLockOverlay.destroy();
+                        _gentleLockOverlay = null;
+                        _gentleLockMonitor = null;
+                        _gentleLockFadeId = null;
+                        return GLib.SOURCE_REMOVE;
+                    }
+
+                    return GLib.SOURCE_CONTINUE;
+                }
+            );
+        } else {
+            _gentleLockMonitor = null;
+        }
     }
-
-    _gentleLockMonitor = null;
-
-    // Use GNOME's native lock screen rather than implementing our own.
-    Main.screenShield.lock(true);
 }
 
 function cancelGentleLock() {

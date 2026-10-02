@@ -21,6 +21,8 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 const ACTIONS = [
     { id: 'disabled',       label: 'Disabled'            },
     { id: 'sleep',          label: 'Sleep (suspend)'     },
+    { id: 'screen-off',     label: 'Turn off screen'     },
+    { id: 'blackout',       label: 'Blackout (fade to black)' },
     { id: 'overview',       label: 'Show overview'       },
     { id: 'show-desktop',   label: 'Show desktop'        },
     { id: 'workspace-next', label: 'Next workspace'      },

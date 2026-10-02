@@ -3,7 +3,7 @@
   <schema id="org.gnome.shell.extensions.corner-gestures"
           path="/org/gnome/shell/extensions/corner-gestures/schemas/">
 
-    <!-- Possible values: "disabled", "sleep", "overview", "show-desktop", "workspace-next", "workspace-prev" -->
+    <!-- Possible values: "disabled", "sleep", "screen-off", "blackout", "overview", "show-desktop", "workspace-next", "workspace-prev" -->
 
     <key name="top-left-action" type="s">
       <default>"sleep"</default>
