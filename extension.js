@@ -137,6 +137,12 @@ function startGentleLock(actionType = 'sleep') {
                     } catch (e) {
                         console.error('Failed to turn off screen:', e);
                     }
+                } else if (_gentleLockActionType === 'sleep') {
+                    try {
+                        GLib.spawn_command_line_async('systemctl suspend');
+                    } catch (e) {
+                        console.error('Failed to suspend:', e);
+                    }
                 }
 
                 return GLib.SOURCE_REMOVE;
@@ -180,16 +186,10 @@ function finishGentleLock(actionType, isCancelled = false) {
     }
 
     if (actionType === 'sleep' && !isCancelled) {
-        if (_gentleLockOverlay) {
-            Main.layoutManager.removeChrome(_gentleLockOverlay);
-            _gentleLockOverlay.destroy();
-            _gentleLockOverlay = null;
-        }
-        _gentleLockMonitor = null;
-        // Use GNOME's native lock screen rather than implementing our own.
         Main.screenShield.lock(true);
-    } else {
-        if (_gentleLockOverlay) {
+    }
+
+    if (_gentleLockOverlay) {
             // Fade back to transparent over 1.5 seconds.
             _gentleLockFadeId = GLib.timeout_add(
                 GLib.PRIORITY_DEFAULT,
@@ -222,7 +222,6 @@ function finishGentleLock(actionType, isCancelled = false) {
         } else {
             _gentleLockMonitor = null;
         }
-    }
 }
 
 function cancelGentleLock() {
