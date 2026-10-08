@@ -109,9 +109,7 @@ function startGentleLock(actionType = 'sleep') {
 
     // Put the blackout above the normal Shell UI, but don't let it consume
     // pointer input; this lets us detect the wake-up movement underneath it.
-    Main.layoutManager.addTopChrome(_gentleLockOverlay, {
-        affectsInputRegion: false,
-    });
+    Main.layoutManager.addTopChrome(_gentleLockOverlay);
 
     // Fade to black over 1.5 seconds.
     _gentleLockFadeId = GLib.timeout_add(
@@ -148,18 +146,29 @@ function startGentleLock(actionType = 'sleep') {
         }
     );
 
-    // Do not lock during the fade. Only movement after the screen is fully
-    // dark wakes it and opens GNOME's lock screen (if configured to lock).
-    _gentleLockMotionId = global.stage.connect('motion-event', () => {
-        if (!_gentleLockOverlay || _gentleLockOverlay.opacity < 255)
+    let [startX, startY] = global.get_pointer();
+
+    // Movement cancels the fade out, or wakes from the blackout.
+    _gentleLockMotionId = global.stage.connect('motion-event', (actor, event) => {
+        if (!_gentleLockOverlay)
             return Clutter.EVENT_PROPAGATE;
 
-        finishGentleLock(_gentleLockActionType);
+        const [x, y] = event.get_coords();
+        const dx = x - startX;
+        const dy = y - startY;
+        
+        // Ignore tiny jitters (10 pixels radius)
+        if (dx * dx + dy * dy < 100) {
+            return Clutter.EVENT_PROPAGATE;
+        }
+
+        const isCancelled = _gentleLockOverlay.opacity < 255;
+        finishGentleLock(_gentleLockActionType, isCancelled);
         return Clutter.EVENT_PROPAGATE;
     });
 }
 
-function finishGentleLock(actionType) {
+function finishGentleLock(actionType, isCancelled = false) {
     if (_gentleLockMotionId) {
         global.stage.disconnect(_gentleLockMotionId);
         _gentleLockMotionId = null;
@@ -170,7 +179,7 @@ function finishGentleLock(actionType) {
         _gentleLockFadeId = null;
     }
 
-    if (actionType === 'sleep') {
+    if (actionType === 'sleep' && !isCancelled) {
         if (_gentleLockOverlay) {
             Main.layoutManager.removeChrome(_gentleLockOverlay);
             _gentleLockOverlay.destroy();
@@ -248,9 +257,8 @@ function cancelGentleLock() {
 const CornerZone = GObject.registerClass(
 class CornerZone extends Clutter.Actor {
 
-    _init(corner, getAction, getDelay, getTriggerSize = null, getBottomOffset = null) {
-        const isBottomLeft = corner === 'bottom-left';
-        const triggerSize = isBottomLeft && getTriggerSize ? getTriggerSize() : 10;
+    _init(corner, getAction, getDelay) {
+        const triggerSize = 10;
 
         super._init({
             name: `CornerZone-${corner}`,
@@ -260,11 +268,9 @@ class CornerZone extends Clutter.Actor {
             opacity: 0,
         });
 
-        this._corner   = corner;   // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+        this._corner   = corner;   // 'top-left' | 'top-right'
         this._getAction = getAction;
         this._getDelay  = getDelay;
-        this._getTriggerSize = getTriggerSize;
-        this._getBottomOffset = getBottomOffset;
         this._timerId   = null;
 
         this.connect('enter-event', this._onEnter.bind(this));
@@ -305,16 +311,6 @@ export default class CornerGesturesExtension extends Extension {
         this._zones    = [];
         this._buildZones();
 
-        // Rebuild the bottom-left zone when its geometry changes.
-        this._triggerSizeChangedId = this._settings.connect(
-            'changed::bottom-left-trigger-size',
-            () => this._rebuildZones()
-        );
-        this._triggerOffsetChangedId = this._settings.connect(
-            'changed::bottom-left-trigger-offset',
-            () => this._rebuildZones()
-        );
-
         // Rebuild when monitor layout changes
         this._monitorsChangedId = Main.layoutManager.connect(
             'monitors-changed',
@@ -327,15 +323,6 @@ export default class CornerGesturesExtension extends Extension {
     disable() {
         cancelGentleLock();
 
-        if (this._triggerSizeChangedId) {
-            this._settings.disconnect(this._triggerSizeChangedId);
-            this._triggerSizeChangedId = null;
-        }
-        if (this._triggerOffsetChangedId) {
-            this._settings.disconnect(this._triggerOffsetChangedId);
-            this._triggerOffsetChangedId = null;
-        }
-
         if (this._monitorsChangedId) {
             Main.layoutManager.disconnect(this._monitorsChangedId);
             this._monitorsChangedId = null;
@@ -346,14 +333,6 @@ export default class CornerGesturesExtension extends Extension {
 
     // ── private ──────────────────────────────────────────────────────────────
 
-    _bottomLeftSize() {
-        return Math.max(1, this._settings.get_int('bottom-left-trigger-size'));
-    }
-
-    _bottomLeftOffset() {
-        return Math.max(0, this._settings.get_int('bottom-left-trigger-offset'));
-    }
-
     _rebuildZones() {
         this._removeZones();
         this._buildZones();
@@ -363,19 +342,12 @@ export default class CornerGesturesExtension extends Extension {
         const monitor = Main.layoutManager.primaryMonitor;
         if (!monitor) return;
 
-        const { x, y, width, height } = monitor;
+        const { x, y, width } = monitor;
 
         // Corner name → pixel position (top-left of the 2×2 zone)
         const corners = {
-            'top-left':     { cx: x,             cy: y              },
-            'top-right':    { cx: x + width - 10,  cy: y              },
-            // Keep the bottom-left trigger above the dock. Its size and
-            // bottom offset are configurable in Preferences.
-            'bottom-left':  {
-                cx: x,
-                cy: y + height - this._bottomLeftOffset() - this._bottomLeftSize(),
-            },
-            'bottom-right': { cx: x + width - 10,  cy: y + height - 10 },
+            'top-left':     { cx: x,             cy: y },
+            'top-right':    { cx: x + width - 10,  cy: y },
         };
 
         for (const [corner, pos] of Object.entries(corners)) {
@@ -384,12 +356,10 @@ export default class CornerGesturesExtension extends Extension {
             const zone = new CornerZone(
                 corner,
                 () => this._settings.get_string(settingKey),
-                () => this._settings.get_int('corner-delay'),
-                corner === 'bottom-left' ? () => this._bottomLeftSize() : null,
-                corner === 'bottom-left' ? () => this._bottomLeftOffset() : null
+                () => this._settings.get_int('corner-delay')
             );
 
-            Main.layoutManager.addChrome(zone, { affectsInputRegion: true });
+            Main.layoutManager.addChrome(zone);
             zone.set_position(pos.cx, pos.cy);
 
             this._zones.push(zone);

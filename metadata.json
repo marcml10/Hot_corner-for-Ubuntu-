@@ -3,7 +3,7 @@
   "description": "Trigger actions (sleep, show overview, etc.) by moving your mouse to screen corners. Each corner is independently configurable.",
   "uuid": "corner-gestures@user",
   "version": 1,
-  "shell-version": ["46"],
+  "shell-version": ["46", "50", "50.1"],
   "settings-schema": "org.gnome.shell.extensions.corner-gestures",
   "url": ""
 }

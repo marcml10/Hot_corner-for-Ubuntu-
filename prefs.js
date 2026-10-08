@@ -33,8 +33,6 @@ const ACTIONS = [
 const CORNER_KEYS = {
     'top-left':     'top-left-action',
     'top-right':    'top-right-action',
-    'bottom-left':  'bottom-left-action',
-    'bottom-right': 'bottom-right-action',
 };
 
 // ─── Helper: build an AdwComboRow bound to a GSettings string key ─────────────
@@ -125,8 +123,6 @@ export default class CornerGesturesPreferences extends ExtensionPreferences {
         const cornerPositions = [
             { key: 'top-left-action',     col: 0, row: 0, label: '↖' },
             { key: 'top-right-action',    col: 2, row: 0, label: '↗' },
-            { key: 'bottom-left-action',  col: 0, row: 2, label: '↙' },
-            { key: 'bottom-right-action', col: 2, row: 2, label: '↘' },
         ];
 
         for (const cp of cornerPositions) {
@@ -172,15 +168,6 @@ export default class CornerGesturesPreferences extends ExtensionPreferences {
             '↗  Top-right corner', 'Action when cursor enters top-right',
             settings, 'top-right-action'
         ));
-        actionsGroup.add(makeActionRow(
-            '↙  Bottom-left corner', 'Action when cursor enters bottom-left',
-            settings, 'bottom-left-action'
-        ));
-        actionsGroup.add(makeActionRow(
-            '↘  Bottom-right corner', 'Action when cursor enters bottom-right',
-            settings, 'bottom-right-action'
-        ));
-
         // ── Delay row ─────────────────────────────────────────────────────────
         const behaviourGroup = new Adw.PreferencesGroup({ title: 'Behaviour' });
         page.add(behaviourGroup);
@@ -209,44 +196,6 @@ export default class CornerGesturesPreferences extends ExtensionPreferences {
             const v = settings.get_int('corner-delay');
             if (adjustment.get_value() !== v)
                 adjustment.set_value(v);
-        });
-
-        // ── Bottom-left trigger area ─────────────────────────────────────────
-        const triggerGroup = new Adw.PreferencesGroup({ title: 'Bottom-left trigger area' });
-        page.add(triggerGroup);
-
-        const sizeAdjustment = new Gtk.Adjustment({
-            lower: 5, upper: 100, step_increment: 5, page_increment: 10,
-            value: settings.get_int('bottom-left-trigger-size'),
-        });
-        const sizeRow = new Adw.SpinRow({
-            title: 'Trigger size',
-            subtitle: 'Size of the bottom-left hot zone in pixels',
-            adjustment: sizeAdjustment, digits: 0,
-        });
-        triggerGroup.add(sizeRow);
-        sizeAdjustment.connect('value-changed', () =>
-            settings.set_int('bottom-left-trigger-size', sizeAdjustment.get_value()));
-        settings.connect('changed::bottom-left-trigger-size', () => {
-            const v = settings.get_int('bottom-left-trigger-size');
-            if (sizeAdjustment.get_value() !== v) sizeAdjustment.set_value(v);
-        });
-
-        const offsetAdjustment = new Gtk.Adjustment({
-            lower: 0, upper: 200, step_increment: 5, page_increment: 10,
-            value: settings.get_int('bottom-left-trigger-offset'),
-        });
-        const offsetRow = new Adw.SpinRow({
-            title: 'Bottom offset',
-            subtitle: 'Distance between the trigger area and the bottom edge in pixels',
-            adjustment: offsetAdjustment, digits: 0,
-        });
-        triggerGroup.add(offsetRow);
-        offsetAdjustment.connect('value-changed', () =>
-            settings.set_int('bottom-left-trigger-offset', offsetAdjustment.get_value()));
-        settings.connect('changed::bottom-left-trigger-offset', () => {
-            const v = settings.get_int('bottom-left-trigger-offset');
-            if (offsetAdjustment.get_value() !== v) offsetAdjustment.set_value(v);
         });
     }
 
